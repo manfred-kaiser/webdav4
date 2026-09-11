@@ -28,7 +28,7 @@ from fsspec.implementations.local import LocalFileSystem
 from fsspec.spec import AbstractFileSystem
 from fsspec.utils import stringify_path
 
-from webdav4 import urls
+from webdav import urls
 
 from .fsspec import WebdavFileSystem
 from .urls import URL

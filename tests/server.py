@@ -64,8 +64,8 @@ if __name__ == "__main__":
     import code
     import tempfile
 
-    from webdav4.client import Client
-    from webdav4.fsspec import WebdavFileSystem
+    from webdav.client import Client
+    from webdav.fsspec import WebdavFileSystem
 
     from .utils import TmpDir
 

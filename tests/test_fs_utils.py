@@ -2,7 +2,7 @@
 
 from io import BytesIO
 
-from webdav4.fs_utils import peek_filelike_length
+from webdav.fs_utils import peek_filelike_length
 
 
 def test_peek_filelike_length():

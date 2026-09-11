@@ -6,7 +6,7 @@ from datetime import datetime
 import pytest
 from dateutil.tz import tzutc
 
-from webdav4.date_utils import from_rfc1123, fromisoformat
+from webdav.date_utils import from_rfc1123, fromisoformat
 
 
 def test_iso8601_parsing():

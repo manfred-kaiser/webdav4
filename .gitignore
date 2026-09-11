@@ -128,5 +128,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-src/webdav4/_version.py
+src/webdav/_version.py
 .idea/

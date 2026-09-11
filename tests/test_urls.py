@@ -2,7 +2,7 @@
 
 import pytest
 
-from webdav4.urls import (
+from webdav.urls import (
     URL,
     join_url,
     join_url_path,

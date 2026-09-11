@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Set, Tuple, Union
 import fsspec
 import pytest
 
-from webdav4.fsspec import WebdavFileSystem
-from webdav4.urls import URL, join_url
+from webdav.fsspec import WebdavFileSystem
+from webdav.urls import URL, join_url
 
 from .utils import TmpDir, approx_datetime
 

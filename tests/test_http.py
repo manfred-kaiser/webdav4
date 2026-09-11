@@ -2,7 +2,7 @@
 
 from unittest import mock
 
-from webdav4.http import Client
+from webdav.http import Client
 
 
 def test_webdav_methods():

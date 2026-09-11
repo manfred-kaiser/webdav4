@@ -9,9 +9,9 @@ import pytest
 from pytest import MonkeyPatch
 
 from tests.utils import TmpDir
-from webdav4.client import Client
-from webdav4.fsspec import WebdavFileSystem
-from webdav4.http import HTTPNetworkError, HTTPResponse
+from webdav.client import Client
+from webdav.fsspec import WebdavFileSystem
+from webdav.http import HTTPNetworkError, HTTPResponse
 
 
 def test_retry_reconnect_on_failure(
@@ -103,7 +103,7 @@ def test_resume_rejects_response_that_ignores_range(
     Splicing it into the output regardless (the old behaviour) would
     silently corrupt the downloaded file.
     """
-    from webdav4 import stream as stream_module
+    from webdav import stream as stream_module
 
     original_iter_bytes = HTTPResponse.iter_bytes
 
@@ -154,7 +154,7 @@ def test_resume_retry_is_bounded(
     ``iter_bytes`` on the class would also break the PROPFIND response
     that ``client.open()`` reads internally before streaming even starts.
     """
-    from webdav4 import stream as stream_module
+    from webdav import stream as stream_module
 
     def always_broken_iter_content(
         *args: Any, **kwargs: Any

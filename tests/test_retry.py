@@ -6,8 +6,8 @@ from unittest import mock
 import pytest
 from httpx import Request, Response
 
-from webdav4.client import BadGatewayError, HTTPError, ResourceLocked
-from webdav4.retry import retry
+from webdav.client import BadGatewayError, HTTPError, ResourceLocked
+from webdav.retry import retry
 
 request = Request("get", "example.com")
 

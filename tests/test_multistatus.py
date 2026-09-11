@@ -8,7 +8,7 @@ import pytest
 from dateutil.tz import tzutc
 from httpx import Response as HTTPResponse
 
-from webdav4.multistatus import (
+from webdav.multistatus import (
     DAVProperties,
     MultiStatusResponse,
     MultiStatusResponseError,
@@ -17,7 +17,7 @@ from webdav4.multistatus import (
     prepare_propfind_request_data,
     prop,
 )
-from webdav4.urls import URL
+from webdav.urls import URL
 
 
 def test_prop():

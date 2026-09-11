@@ -15,7 +15,7 @@ import pytest
 from fsspec.implementations.memory import MemoryFileSystem as _MemoryFS
 from pytest import CaptureFixture, MonkeyPatch
 
-from webdav4.cli import (
+from webdav.cli import (
     Command,
     CommandCat,
     CommandCopy,

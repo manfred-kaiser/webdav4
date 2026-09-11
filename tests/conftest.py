@@ -5,10 +5,10 @@ from typing import Iterator, Tuple
 import pytest
 from cheroot import wsgi
 
-from webdav4 import retry
-from webdav4.client import Client
-from webdav4.fsspec import WebdavFileSystem
-from webdav4.urls import URL
+from webdav import retry
+from webdav.client import Client
+from webdav.fsspec import WebdavFileSystem
+from webdav.urls import URL
 
 from .server import AUTH, get_server_address, run_server
 from .utils import TmpDir

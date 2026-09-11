@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import Request, Response
 
-from webdav4.client import (
+from webdav.client import (
     BadGatewayError,
     Client,
     FeatureDetection,
@@ -25,9 +25,9 @@ from webdav4.client import (
     ResourceLocked,
     ResourceNotFound,
 )
-from webdav4.http import Client as HTTPClient
-from webdav4.http import Method as HTTPMethod
-from webdav4.urls import URL
+from webdav.http import Client as HTTPClient
+from webdav.http import Method as HTTPMethod
+from webdav.urls import URL
 
 from .utils import TmpDir, approx_datetime
 
