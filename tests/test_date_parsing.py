@@ -1,5 +1,6 @@
 """Testing date parsing logic here."""
 
+import time
 from datetime import datetime
 
 import pytest
@@ -42,3 +43,32 @@ def test_non_standard_datetimes(datestring):
     dt = datetime(2020, 1, 2, 3, 4, 5, tzinfo=tzutc())
     assert fromisoformat(datestring) == dt
     assert from_rfc1123(datestring) == dt
+
+
+@pytest.mark.parametrize(
+    "datestring",
+    [
+        "not-a-real-date-at-all",
+        "",
+        "Fri, 99 Xyz 2020 99:99:99 GMT",
+    ],
+)
+def test_unparseable_date_returns_none_instead_of_raising(datestring):
+    """A malformed date from a server must not raise - one bad entry
+    shouldn't be able to abort parsing of an entire response.
+    """
+    assert fromisoformat(datestring) is None
+    assert from_rfc1123(datestring) is None
+
+
+def test_overly_long_date_string_returns_none_quickly():
+    """A pathologically long digit string must be rejected up front.
+
+    Without the length cap, dateutil's numeric tokenizing costs
+    quadratic time on inputs like this before eventually giving up.
+    """
+    huge = "1" * 200_000
+    start = time.monotonic()
+    assert fromisoformat(huge) is None
+    assert from_rfc1123(huge) is None
+    assert time.monotonic() - start < 1.0

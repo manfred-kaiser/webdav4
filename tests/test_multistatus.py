@@ -350,6 +350,49 @@ def test_prepare_propfind_data(
     assert body == expected.format(expected_inner_element)
 
 
+def test_parse_multistatus_response_tolerates_one_bad_date():
+    """A single malformed date on one entry must not discard the rest.
+
+    Previously this raised and the caller lost every other, otherwise
+    valid, entry in the same response.
+    """
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+    <d:multistatus xmlns:d="DAV:">
+      <d:response>
+        <d:href>/base/good1.txt</d:href>
+        <d:propstat>
+          <d:prop><d:getlastmodified>Mon, 12 Jan 1998 09:25:56 GMT</d:getlastmodified></d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+      <d:response>
+        <d:href>/base/bad.txt</d:href>
+        <d:propstat>
+          <d:prop><d:getlastmodified>not-a-real-date-at-all</d:getlastmodified></d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+      <d:response>
+        <d:href>/base/good2.txt</d:href>
+        <d:propstat>
+          <d:prop><d:getlastmodified>Mon, 12 Jan 1998 09:25:56 GMT</d:getlastmodified></d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+    </d:multistatus>"""
+
+    res = parse_multistatus_response(HTTPResponse(status_code=207, text=xml))
+    assert len(res.responses) == 3
+
+    good1 = res.responses["/base/good1.txt"]
+    bad = res.responses["/base/bad.txt"]
+    good2 = res.responses["/base/good2.txt"]
+
+    assert good1.properties.modified is not None
+    assert bad.properties.modified is None
+    assert good2.properties.modified is not None
+
+
 def test_try_parse_multistatus_response_for_not_a_207_response():
     """Test trying to parse with a multistatus response that's not 207."""
     with pytest.raises(ValueError) as exc_info:
