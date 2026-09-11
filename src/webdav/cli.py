@@ -527,7 +527,7 @@ def prepare_url_auth(
     # every request built from it) may end up logged or shown in a
     # traceback, e.g. with --verbose, and neither should ever be able to
     # leak the password.
-    return url_obj.copy_with(username="", password=""), auth
+    return url_obj.copy_with(username="", password=""), auth  # nosec B106 - clearing, not setting, a credential
 
 
 class Command:

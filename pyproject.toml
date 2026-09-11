@@ -33,6 +33,7 @@ optional-dependencies.docs = [
 optional-dependencies.fsspec = [ "fsspec>=2021.7" ]
 optional-dependencies.http2 = [ "httpx[http2]<1,>=0.26.0" ]
 optional-dependencies.qa = [
+  "bandit",
   "mypy==1.19.1",
   "pre-commit",
   "types-colorama",
@@ -84,6 +85,15 @@ lint.flake8-annotations.allow-star-arg-any = true # **kwargs passthrough to http
 lint.flake8-type-checking.strict = true
 lint.isort.known-first-party = [ "webdav" ]
 lint.preview = true
+
+[tool.bandit]
+# B101 (assert): every use in src/ is an internal type-narrowing check,
+# individually reviewed - not input validation or a security boundary.
+# B405 (blacklisted xml import): stdlib ElementTree never resolves external
+# entities and modern expat (>=2.4.0) rejects billion-laughs amplification
+# by default - verified empirically, not just assumed (same reasoning as
+# the inline "nosec B314" on the actual parse call).
+skips = [ "B101", "B405" ]
 
 [tool.codespell]
 ignore-words-list = "cachable"

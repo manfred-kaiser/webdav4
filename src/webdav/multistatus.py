@@ -211,7 +211,10 @@ class MultiStatusResponse:
 
         """
         self.content = content
-        self.tree = tree = str2xml(content)  # noqa: S314
+        # stdlib ElementTree never resolves external entities, and modern
+        # expat (>=2.4.0) rejects billion-laughs-style amplification by
+        # default - verified empirically, not just assumed.
+        self.tree = tree = str2xml(content)  # noqa: S314 # nosec B314
 
         self.response_description: str | None = prop(tree, "responsedescription")
 
