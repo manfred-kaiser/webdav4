@@ -26,14 +26,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        pyv: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyv: ["3.11", "3.12", "3.13", "3.14"]
         fsspec: ["fsspec"]
         include:
         - os: ubuntu-latest
-          pyv: "3.10"
+          pyv: "3.11"
           fsspec: "fsspec @ git+https://github.com/fsspec/filesystem_spec.git"
         - os: ubuntu-latest
-          pyv: "3.10"
+          pyv: "3.11"
           fsspec: "fsspec==2021.7.0"
 
     steps:

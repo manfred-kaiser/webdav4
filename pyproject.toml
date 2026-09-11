@@ -11,13 +11,10 @@ license = "MIT"
 license-files = [ "LICENSE" ]
 authors = [ { name = "Saugat Pachhai", email = "suagatchhetri@outlook.com" } ]
 maintainers = [ { name = "Manfred Kaiser", email = "manfred.kaiser@ssh-mitm.at" } ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -28,8 +25,7 @@ dependencies = [ "httpx<1,>=0.26.0", "python-dateutil>=2.8.1" ]
 optional-dependencies.all = [ "webdav-rfc4918-client[fsspec,http2]" ]
 optional-dependencies.dev = [ "webdav-rfc4918-client[docs,fsspec,http2,qa,tests]" ]
 optional-dependencies.docs = [
-  "furo==2024.8.6; python_version=='3.8'",
-  "furo==2025.12.19; python_version>='3.9'",
+  "furo==2025.12.19",
   "myst-parser>=3,<6",
   "sphinx>=7,<10",
   "sphinx-copybutton==0.5.2",
@@ -37,8 +33,7 @@ optional-dependencies.docs = [
 optional-dependencies.fsspec = [ "fsspec>=2021.7" ]
 optional-dependencies.http2 = [ "httpx[http2]<1,>=0.26.0" ]
 optional-dependencies.qa = [
-  "mypy==1.14; python_version=='3.8'",
-  "mypy==1.19.1; python_version>='3.9'",
+  "mypy==1.19.1",
   "pre-commit",
   "types-colorama",
   "types-python-dateutil",
@@ -65,70 +60,27 @@ version.source = "vcs"
 show-fixes = true
 format.preview = true
 format.docstring-code-format = true
-lint.select = [
-  "ASYNC",  # flake8-async
-  "B",      # flake8-bugbear
-  "BLE",    # flake8-blind-except
-  "C4",     # flake8-comprehensions
-  "C90",    # mccabe
-  "DTZ",    # flake8-datetimez
-  "E",      # pycodestyle - Error
-  "EXE",    # flake8-executable
-  "F",      # pyflakes
-  "FLY",    # flynt
-  "FURB",   # refurb
-  "G",      # flake8-logging-format
-  "I",      # isort
-  "ICN",    # flake8-import-conventions
-  "INP",    # flake8-no-pep420
-  "ISC",    # flake8-implicit-str-concat
-  "LOG",    # flake8-logging
-  "N",      # pep8-naming
-  "NPY",    # numpy
-  "PERF",   # perflint
-  "PGH",    # pygrep-hooks
-  "PIE",    # flake8-pie
-  "PL",     # pylint
-  "PYI",    # flake8-pyi
-  "Q",      # flake8-quotes
-  "RET",    # flake8-return
-  "RSE",    # flake8-raise
-  "RUF",    # ruff rules
-  "RUF022", # unsorted-dunder-all
-  "RUF023", # unsorted-dunder-slots
-  "RUF027", # missing-f-string-syntax
-  "RUF030", # assert-with-print-message
-  "RUF101", # redirected-noqa
-  "S",      # flake8-bandit
-  "SIM",    # flake8-simplify
-  "SLOT",   # flake8-slots
-  "T10",    # flake8-debugger
-  "TCH",    # flake8-type-checking
-  "TID",    # flake8-tidy-imports
-  "TRY004", # type-check-without-type-error
-  "TRY201", # verbose-raise
-  "TRY203", # useless-try-except
-  "TRY401", # verbose-log-message
-  "UP",     # pyupgrade
-  "W",      # pycodestyle - Warning
-  "YTT",    # flake8-2020
-]
+lint.select = [ "ALL" ]
 lint.ignore = [
-  "ISC001",  # single-line-implicit-string-concatenation, incompatible with ruff format
-  "PERF203", # perflint - try-except-in-loop, irrelevant for Python>=3.11
-  "PGH003",
-  "PLR2004", # magic-value-comparison
-  "PLW2901", # redefined-loop-name
-  "RET502",  # implicit-return-value
-  "RET503",  # implicit-return
-  "S101",    # assert
-  "SIM105",  # suppressible-exception
-  "SIM108",  # if-else-block-instead-of-if-exp
-  "SIM117",  # multiple-with-statements
+  "CPY001", # missing-copyright-notice - LICENSE already carries it, no per-file headers used
+  "D401",   # non-imperative-mood - docstring grammar, no effect on correctness/behavior
+  "ISC001", # single-line-implicit-string-concatenation, incompatible with ruff format
 ]
 lint.explicit-preview-rules = true
 lint.per-file-ignores."docs/**" = [ "INP001" ]
-lint.per-file-ignores."tests/**" = [ "DTZ002", "S106", "S314" ]
+lint.per-file-ignores."src/webdav/cli.py" = [ "T201" ] # it's a CLI, printing to stdout is the point
+lint.per-file-ignores."tests/**" = [
+  "ANN",     # return/argument types not required on test functions
+  "DTZ002",
+  "PGH003",  # blanket `type: ignore` is fine in tests
+  "PLR2004", # magic values in test data/assertions are normal
+  "S101",    # assert is the standard pytest idiom
+  "S106",
+  "S314",
+  "SLF001",  # tests intentionally reach into internals to set up scenarios
+]
+lint.per-file-ignores."tests/server.py" = [ "T201" ] # interactive REPL helper, not library code
+lint.flake8-annotations.allow-star-arg-any = true # **kwargs passthrough to httpx is legitimately dynamic
 lint.flake8-type-checking.strict = true
 lint.isort.known-first-party = [ "webdav" ]
 lint.preview = true

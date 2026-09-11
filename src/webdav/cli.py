@@ -9,18 +9,13 @@ import posixpath
 import re
 import sys
 from argparse import Namespace
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from posixpath import sep
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Iterator,
-    List,
     NamedTuple,
-    Optional,
-    Set,
-    Tuple,
     cast,
 )
 
@@ -80,11 +75,11 @@ class LSTheme:
     """
 
     def __init__(
-        self, lscolors: Optional[str] = None, dir_trailing_slash: bool = False
+        self, lscolors: str | None = None, dir_trailing_slash: bool = False,
     ) -> None:
         """Build theme from optional lscolors and other configs."""
-        self.extensions: Dict[str, str] = {}
-        self.codes: Dict[str, str] = {}
+        self.extensions: dict[str, str] = {}
+        self.codes: dict[str, str] = {}
         self.dir_trailing_slash: bool = dir_trailing_slash
         self.lscolors: str = lscolors or os.environ.get("LS_COLORS") or ""
 
@@ -357,15 +352,15 @@ def is_compiled(file: File) -> bool:
 
 
 def _color_file(  # noqa: C901
-    file: File, isdir: bool = False
-) -> Optional[str]:
+    file: File, isdir: bool = False,
+) -> str | None:
     """Returns a color appropriate for file/dir based on ext/path etc."""
     try:
         import colorama  # noqa: PLC0415
     except ModuleNotFoundError:  # pragma: no cover
         return None
 
-    color: Optional[str] = None
+    color: str | None = None
     if isdir:
         color = colorama.Style.BRIGHT + colorama.Fore.BLUE
     elif is_temp(file):
@@ -438,7 +433,7 @@ def to_fixed_width(n: float, max_width: int) -> str:
     return float_str
 
 
-def human_size(nbytes: Optional[float]) -> Tuple[str, str]:
+def human_size(nbytes: float | None) -> tuple[str, str]:
     """Converts bytes to human-readable size."""
     if nbytes is None:
         return "", "-"
@@ -485,7 +480,7 @@ def process_url(url: str) -> str:
 SENSITIVE_ARG_NAMES = {"password"}
 
 
-def redact_sensitive(values: Dict[str, Any]) -> Dict[str, Any]:
+def redact_sensitive(values: dict[str, Any]) -> dict[str, Any]:
     """Replaces known-sensitive values (e.g. passwords) before logging."""
     return {
         key: "***" if key in SENSITIVE_ARG_NAMES else value
@@ -495,7 +490,7 @@ def redact_sensitive(values: Dict[str, Any]) -> Dict[str, Any]:
 
 def prepare_url_auth(
     args: Namespace,
-) -> Tuple[urls.URL, Optional[Tuple[str, str]]]:
+) -> tuple[urls.URL, tuple[str, str] | None]:
     """Process url and auth from the given arguments or from the envvar.
 
     That includes using user and password from url itself.
@@ -508,7 +503,7 @@ def prepare_url_auth(
         raise ValueError(
             "no endpoint url specified, "
             "please specify it through --endpoint-url "
-            "or via WEBDAV_ENDPOINT_URL envvar."
+            "or via WEBDAV_ENDPOINT_URL envvar.",
         )
 
     url_obj = URL(process_url(url))
@@ -539,7 +534,7 @@ class Command:
     """Base class for all commands."""
 
     def __init__(
-        self, args: Namespace, fs: Optional[AbstractFileSystem] = None
+        self, args: Namespace, fs: AbstractFileSystem | None = None,
     ) -> None:
         """Pass the arguments and optionally fs."""
         self.args = args
@@ -584,14 +579,14 @@ class CommandLS(Command):
         withdirs = not self.args.recursive or bool(self.args.level)
         depth = self.args.level if self.args.recursive else 1
 
-        fs_path = self.fs._strip_protocol(self.args.path)
+        fs_path = self.fs._strip_protocol(self.args.path)  # noqa: SLF001 - fsspec's own extension point
         details = self.fs.find(fs_path, maxdepth=depth, detail=True, withdirs=withdirs)
 
         # remove root path
         if details.get(fs_path, {}).get("type") == "directory":
             details.pop(fs_path, None)
 
-        path = self.fs._strip_protocol(self.args.path).strip("/")
+        path = self.fs._strip_protocol(self.args.path).strip("/")  # noqa: SLF001 - fsspec's own extension point
         path_level = path.count(sep) + 1 if path else 0
 
         if not details:
@@ -622,7 +617,7 @@ class CommandLS(Command):
             yield Row(date=date, size=size, file=file_name, isdir=isdir)
 
     @staticmethod
-    def render(details: List[Row]) -> None:
+    def render(details: list[Row]) -> None:
         """Display provided information in a columnar format."""
         if not details:
             return
@@ -635,7 +630,7 @@ class CommandLS(Command):
 
             size_just = size_maxsize if row.size.suff else size_maxsize + 1
             size = theme.style_size(
-                row.size.nbytes.rjust(size_just), suff=row.size.suff
+                row.size.nbytes.rjust(size_just), suff=row.size.suff,
             )
             file = theme.style_path(row.file, isdir=row.isdir)
             print(date, size, file)
@@ -648,7 +643,7 @@ class CommandLS(Command):
             details = list(self.ls())
         except FileNotFoundError as exc:
             raise FileNotFoundError(
-                errno.ENOENT, "No such file or directory", self.args.path
+                errno.ENOENT, "No such file or directory", self.args.path,
             ) from exc
         return self.render(details)
 
@@ -778,15 +773,15 @@ class CommandSync(Command):
             dest_fs.copy(src, dest, recursive=recursive)
 
     @classmethod
-    def changed(cls, src_details: Dict[str, Any], dest_details: Dict[str, Any]) -> bool:
+    def changed(cls, src_details: dict[str, Any], dest_details: dict[str, Any]) -> bool:
         """See if a src and dest have changed or not."""
 
-        def get_mtime(info: Dict[str, Any]) -> Optional[datetime]:
+        def get_mtime(info: dict[str, Any]) -> datetime | None:
             mtime = info.get("mtime") or info.get("modified") or info.get("created")
             if isinstance(mtime, float):
-                return datetime.fromtimestamp(mtime, timezone.utc)
+                return datetime.fromtimestamp(mtime, UTC)
             if isinstance(mtime, datetime):
-                return mtime.astimezone(timezone.utc)
+                return mtime.astimezone(UTC)
             return mtime
 
         src_type = src_details.get("type")
@@ -811,19 +806,19 @@ class CommandSync(Command):
             raise TypeError(
                 "cannot sync between different types, "
                 f"src is {src_type}, "
-                f"dest is {dest_type}"
+                f"dest is {dest_type}",
             )
         return False
 
     @classmethod
     def diff(
         cls,
-        src_info: Dict[str, Dict[str, Any]],
-        dest_info: Dict[str, Dict[str, Any]],
-    ) -> Tuple[List[str], Set[str]]:
+        src_info: dict[str, dict[str, Any]],
+        dest_info: dict[str, dict[str, Any]],
+    ) -> tuple[list[str], set[str]]:
         """Diff between src info and dest info to see if they have changed."""
-        only_in_dest: Set[str] = set(dest_info) - set(src_info)
-        changed: List[str] = []
+        only_in_dest: set[str] = set(dest_info) - set(src_info)
+        changed: list[str] = []
         for file, src_d in src_info.items():
             dest_d = dest_info.get(file)
             if cls.changed(src_d, dest_d or {}):
@@ -832,7 +827,7 @@ class CommandSync(Command):
         return changed, only_in_dest
 
     @staticmethod
-    def _transform_info(infos: List[Dict[str, Any]], rel: str) -> Dict[str, Any]:
+    def _transform_info(infos: list[dict[str, Any]], rel: str) -> dict[str, Any]:
         """Convert to relative paths for easier diff comparison."""
         return {os.path.relpath(info["name"], rel): info for info in infos}
 
@@ -897,8 +892,8 @@ class CommandSync(Command):
         else:
             src_fs, dest_fs = LocalFileSystem(), self.fs
 
-        src = src_fs._strip_protocol(src)
-        dest = dest_fs._strip_protocol(dest)
+        src = src_fs._strip_protocol(src)  # noqa: SLF001 - fsspec's own extension point
+        dest = dest_fs._strip_protocol(dest)  # noqa: SLF001 - fsspec's own extension point
         return self.sync(src, dest, src_fs, dest_fs)
 
 
@@ -940,7 +935,7 @@ class CommandDiskUsage(Command):
         )
 
 
-def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
+def get_parser() -> tuple["ArgumentParser", dict[str, "ArgumentParser"]]:
     """Returns the parser and dict of subparsers.
 
     We use this dict of subparsers to parse commands in `run` command.
@@ -961,7 +956,7 @@ def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
         default=None,
     )
     parser.add_argument(
-        "--user", "-u", help="Account Username", default=None, required=False
+        "--user", "-u", help="Account Username", default=None, required=False,
     )
     parser.add_argument(
         "--password",
@@ -998,7 +993,7 @@ def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
         help="Show full path of the files and the directories",
     )
     ls_parser.add_argument(
-        "path", nargs="?", default="dav://", help="Path to list from"
+        "path", nargs="?", default="dav://", help="Path to list from",
     )
     ls_parser.set_defaults(func=CommandLS)
 
@@ -1047,7 +1042,7 @@ def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
     mv_parser.set_defaults(func=CommandMove)
 
     rm_parser = subparsers.add_parser(
-        "rm", help="Removes a file from the remote server."
+        "rm", help="Removes a file from the remote server.",
     )
     rm_parser.add_argument(
         "--recursive",
@@ -1060,7 +1055,7 @@ def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
     rm_parser.set_defaults(func=CommandRemove)
 
     mkdir_parser = subparsers.add_parser(
-        "mkdir", help="Creates a directory/collection in the remote server."
+        "mkdir", help="Creates a directory/collection in the remote server.",
     )
     mkdir_parser.add_argument(
         "--parents",
@@ -1074,7 +1069,7 @@ def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
 
     run_parser = subparsers.add_parser("run", help="Run multiple commands")
     run_parser.add_argument(
-        "path", metavar="FILE", help="files to read, if empty, stdin is used"
+        "path", metavar="FILE", help="files to read, if empty, stdin is used",
     )
     run_parser.set_defaults(func=CommandRun)
 
@@ -1124,14 +1119,14 @@ def get_parser() -> Tuple["ArgumentParser", Dict[str, "ArgumentParser"]]:
     }
 
 
-def run_cmd(args: Namespace, fs: Optional[AbstractFileSystem] = None) -> Optional[int]:
+def run_cmd(args: Namespace, fs: AbstractFileSystem | None = None) -> int | None:
     """Run cmd from given args."""
     cmd = cast("Command", args.func(args, fs=fs))
     cmd.run()
     return 0
 
 
-def main(argv: Optional[List[str]] = None) -> Optional[int]:
+def main(argv: list[str] | None = None) -> int | None:
     """Command line entrypoint."""
     parser, subparsers = get_parser()
     args = parser.parse_args(argv)
