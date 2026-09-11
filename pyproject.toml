@@ -9,7 +9,11 @@ readme = "README.md"
 keywords = [ "fsspec", "webdav", "webdav-cli", "webdav-client" ]
 license = "MIT"
 license-files = [ "LICENSE" ]
-authors = [ { name = "Saugat Pachhai", email = "suagatchhetri@outlook.com" } ]
+authors = [
+  { name = "Saugat Pachhai", email = "suagatchhetri@outlook.com" },
+  { name = "Manfred Kaiser", email = "manfred.kaiser@ssh-mitm.at" },
+]
+maintainers = [ { name = "Manfred Kaiser", email = "manfred.kaiser@ssh-mitm.at" } ]
 requires-python = ">=3.8"
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -51,9 +55,8 @@ optional-dependencies.tests = [
   "typing-extensions",
   "wsgidav",
 ]
-urls."Bug Tracker" = "https://github.com/skshetry/webdav4/issues"
-urls.Documentation = "https://skshetry.github.io/webdav4"
-urls."Source Code" = "https://github.com/skshetry/webdav4"
+urls."Bug Tracker" = "https://github.com/manfred-kaiser/webdav4/issues"
+urls."Source Code" = "https://github.com/manfred-kaiser/webdav4"
 scripts.dav = "webdav.cli:main"
 
 [tool.hatch]
