@@ -1,5 +1,6 @@
 """Handle streaming response for file."""
 
+import time
 from contextlib import contextmanager
 from functools import partial
 from http import HTTPStatus
@@ -21,6 +22,47 @@ if TYPE_CHECKING:
     from .client import Client
     from .http import Client as HTTPClient
     from .types import HTTPResponse, URLTypes
+
+MAX_RESUME_ATTEMPTS = 5
+RESUME_BACKOFF_SECONDS = 1.0
+
+
+def _validate_resumed_response(
+    response: "HTTPResponse",
+    pos: int,
+    etag: Optional[str],
+    last_modified: Optional[str],
+) -> None:
+    """Ensures a ranged response actually continues from ``pos``.
+
+    A server that silently ignores the ``Range`` header (returning ``200``
+    with the full body instead of ``206`` starting at ``pos``), or that
+    serves a different representation of the resource than the one the
+    stream started with, would otherwise get spliced into the output with
+    no indication that anything went wrong.
+    """
+    if response.status_code != HTTPStatus.PARTIAL_CONTENT:
+        raise HTTPNetworkError(
+            f"expected a 206 Partial Content response resuming at byte "
+            f"{pos}, got {response.status_code}"
+        )
+
+    content_range = response.headers.get("Content-Range", "")
+    if not content_range.startswith(f"bytes {pos}-"):
+        raise HTTPNetworkError(
+            f"expected Content-Range starting at byte {pos}, "
+            f"got {content_range!r}"
+        )
+
+    new_etag = response.headers.get("ETag")
+    if etag and new_etag and new_etag != etag:
+        raise HTTPNetworkError("resource changed during download (ETag mismatch)")
+
+    new_last_modified = response.headers.get("Last-Modified")
+    if last_modified and new_last_modified and new_last_modified != last_modified:
+        raise HTTPNetworkError(
+            "resource changed during download (Last-Modified mismatch)"
+        )
 
 
 def request(client: "HTTPClient", url: "URLTypes", pos: int = 0) -> "HTTPResponse":
@@ -49,11 +91,17 @@ def iter_url(
         response: "HTTPResponse",
     ) -> Generator[bytes, None, None]:
         nonlocal pos
+        etag = response.headers.get("ETag")
+        last_modified = response.headers.get("Last-Modified")
+        attempts = 0
         try:
             while True:
                 if response.status_code == HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE:
                     return  # range request outside file
                 response.raise_for_status()
+
+                if pos:
+                    _validate_resumed_response(response, pos, etag, last_modified)
 
                 try:
                     for chunk in response.iter_bytes(chunk_size=chunk_size):
@@ -67,6 +115,10 @@ def iter_url(
                         or client.detected_features.supports_ranges
                     ):
                         raise
+                    attempts += 1
+                    if attempts > MAX_RESUME_ATTEMPTS:
+                        raise
+                    time.sleep(RESUME_BACKOFF_SECONDS * attempts)
                     response = request(client.http, url, pos=pos)
         finally:
             response.close()

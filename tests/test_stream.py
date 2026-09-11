@@ -93,6 +93,98 @@ def test_retry_reconnect_on_failure(
             assert str(exc_info.value) == "server does not support ranges"
 
 
+def test_resume_rejects_response_that_ignores_range(
+    storage_dir: TmpDir,
+    client: Client,
+    monkeypatch: MonkeyPatch,
+):
+    """A resume response that isn't a real 206 continuation must be rejected.
+
+    Splicing it into the output regardless (the old behaviour) would
+    silently corrupt the downloaded file.
+    """
+    from webdav4 import stream as stream_module
+
+    original_iter_bytes = HTTPResponse.iter_bytes
+
+    def bad_iter_content(
+        response: "HTTPResponse", *args: Any, **kwargs: Any
+    ) -> Iterator[bytes]:
+        it = original_iter_bytes(response, *args, **kwargs)
+        for i, chunk in enumerate(it):
+            if i > 0:
+                raise HTTPNetworkError(
+                    "Simulated connection drop", request=response.request
+                )
+            yield chunk
+
+    text = "0123456789" * (client.chunk_size // 10 + 1)
+    storage_dir.gen("sample.txt", text * 2)
+
+    monkeypatch.setattr(HTTPResponse, "iter_bytes", bad_iter_content)
+
+    original_request = stream_module.request
+
+    def fake_request(http_client: Any, url: Any, pos: int = 0) -> "HTTPResponse":
+        if pos:
+            import httpx
+
+            return httpx.Response(
+                200,
+                content=b"unexpected full content instead of a resume",
+                request=httpx.Request("GET", str(url)),
+            )
+        return original_request(http_client, url, pos=pos)
+
+    monkeypatch.setattr(stream_module, "request", fake_request)
+
+    with pytest.raises(HTTPNetworkError):
+        with client.open("sample.txt", mode="rb") as fd:
+            fd.read()
+
+
+def test_resume_retry_is_bounded(
+    storage_dir: TmpDir,
+    client: Client,
+    monkeypatch: MonkeyPatch,
+):
+    """Repeated connection drops during resume must not retry forever.
+
+    Only the streaming GET's response is made to fail - patching
+    ``iter_bytes`` on the class would also break the PROPFIND response
+    that ``client.open()`` reads internally before streaming even starts.
+    """
+    from webdav4 import stream as stream_module
+
+    def always_broken_iter_content(
+        *args: Any, **kwargs: Any
+    ) -> Iterator[bytes]:
+        raise HTTPNetworkError("Simulated connection drop")
+        yield  # pragma: no cover
+
+    text = "0123456789" * (client.chunk_size // 10 + 1)
+    storage_dir.gen("sample.txt", text * 2)
+
+    monkeypatch.setattr(stream_module.time, "sleep", lambda _: None)
+
+    attempts = {"count": 0}
+    original_request = stream_module.request
+
+    def counting_request(http_client: Any, url: Any, pos: int = 0) -> "HTTPResponse":
+        attempts["count"] += 1
+        response = original_request(http_client, url, pos=pos)
+        response.iter_bytes = always_broken_iter_content  # type: ignore[method-assign]
+        return response
+
+    monkeypatch.setattr(stream_module, "request", counting_request)
+
+    with pytest.raises(HTTPNetworkError):
+        with client.open("sample.txt", mode="rb") as fd:
+            fd.read()
+
+    assert attempts["count"] == stream_module.MAX_RESUME_ATTEMPTS + 1
+
+
 def test_open(storage_dir: TmpDir, fs: WebdavFileSystem):
     """Test opening a remote file from webdav using fs in text mode."""
     text1 = "0123456789" * (DEFAULT_BUFFER_SIZE // 10 + 1)
