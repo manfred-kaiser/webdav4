@@ -1,5 +1,6 @@
 """Parsing propfind response."""
 
+import logging
 from http.client import responses
 from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, ElementTree, SubElement
@@ -8,6 +9,8 @@ from xml.etree.ElementTree import tostring as xml2string
 
 from .date_utils import from_rfc1123, fromisoformat
 from .urls import URL, join_url_path, relative_url_to, strip_trailing_slash
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from httpx import Response as HTTPResponse
@@ -126,7 +129,11 @@ class Response:
         """
         self.response_xml = response_xml
         href = prop(response_xml, "href")
-        assert href
+        if not href:
+            # a plain `assert` here would be stripped under `python -O`,
+            # silently letting a response with no href through instead of
+            # rejecting it - this must hold unconditionally.
+            raise ValueError("<d:response> is missing a required <d:href>")
 
         parsed = URL(href)
 
@@ -220,7 +227,16 @@ class MultiStatusResponse:
 
         self.responses: dict[str, Response] = {}
         for resp in tree.findall(".//{DAV:}response"):
-            r_obj = Response(resp)
+            try:
+                r_obj = Response(resp)
+            except Exception:
+                # one malformed entry must not discard every other,
+                # otherwise valid, entry in the same multistatus reply
+                # (same reasoning as date_utils.py) - logged, not swallowed.
+                logger.warning(
+                    "skipping unparseable <d:response> entry", exc_info=True,
+                )
+                continue
             self.responses[r_obj.path_norm] = r_obj
 
     def get_response_for_path(self, hostname: str, path: str) -> Response:
