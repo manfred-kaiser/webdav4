@@ -35,6 +35,7 @@ from webdav4.cli import (
     get_parser,
     human_size,
     main,
+    redact_sensitive,
 )
 
 from .utils import TmpDir
@@ -698,6 +699,28 @@ def test_auth(monkeypatch: MonkeyPatch):
     assert Command(ns).auth == ("user2", "pwd2")
 
     monkeypatch.delenv("WEBDAV_ENDPOINT_URL")
+
+
+def test_endpoint_url_never_carries_credentials():
+    """The stored/loggable endpoint URL must never contain the password.
+
+    Otherwise it (or a request built from it) can leak the password via
+    debug logging or an unhandled exception's traceback.
+    """
+    ns = Namespace(endpoint_url="http://user:pwd@server.com", user=None, password=None)
+    cmd = Command(ns)
+    assert cmd.auth == ("user", "pwd")
+    assert "pwd" not in str(cmd.endpoint_url)
+    assert "user" not in str(cmd.endpoint_url)
+    assert str(cmd.endpoint_url) == "http://server.com"
+
+
+def test_redact_sensitive():
+    """Known-sensitive keys are replaced before logging, others pass through."""
+    values = {"password": "s3cret", "user": "alice", "path": "/foo"}
+    redacted = redact_sensitive(values)
+    assert redacted == {"password": "***", "user": "alice", "path": "/foo"}
+    assert "s3cret" not in str(redacted)
 
 
 def test_main():

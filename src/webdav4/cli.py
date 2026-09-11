@@ -482,6 +482,17 @@ def process_url(url: str) -> str:
     return url
 
 
+SENSITIVE_ARG_NAMES = {"password"}
+
+
+def redact_sensitive(values: Dict[str, Any]) -> Dict[str, Any]:
+    """Replaces known-sensitive values (e.g. passwords) before logging."""
+    return {
+        key: "***" if key in SENSITIVE_ARG_NAMES else value
+        for key, value in values.items()
+    }
+
+
 def prepare_url_auth(
     args: Namespace,
 ) -> Tuple[urls.URL, Optional[Tuple[str, str]]]:
@@ -517,7 +528,11 @@ def prepare_url_auth(
     if user and password:
         auth = user, password
 
-    return url_obj, auth
+    # Strip any credentials embedded in the URL itself: this object (and
+    # every request built from it) may end up logged or shown in a
+    # traceback, e.g. with --verbose, and neither should ever be able to
+    # leak the password.
+    return url_obj.copy_with(username="", password=""), auth
 
 
 class Command:
@@ -706,21 +721,21 @@ class CommandRun(Command):
                 if line.startswith("#"):
                     continue
 
-            cmd, *args = line.strip().split()
-            subparsers = self.args.subparsers
-            if cmd not in subparsers:
-                raise ValueError(f"unknown command: {cmd}")
+                cmd, *args = line.strip().split()
+                subparsers = self.args.subparsers
+                if cmd not in subparsers:
+                    raise ValueError(f"unknown command: {cmd}")
 
-            subparser = subparsers[cmd]
-            sub_args = subparser.parse_args(args)
+                subparser = subparsers[cmd]
+                sub_args = subparser.parse_args(args)
 
-            namespace = Namespace(**vars(self.args))
-            namespace.__dict__.update(vars(sub_args))
-            logger.debug(str(vars(namespace)))
+                namespace = Namespace(**vars(self.args))
+                namespace.__dict__.update(vars(sub_args))
+                logger.debug(str(redact_sensitive(vars(namespace))))
 
-            print("\n" if count else "", line, sep="", end="")
-            run_cmd(namespace, self.fs)
-            count += 1
+                print("\n" if count else "", line, sep="", end="")
+                run_cmd(namespace, self.fs)
+                count += 1
 
 
 class CommandCat(Command):
