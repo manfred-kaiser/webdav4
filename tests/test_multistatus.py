@@ -393,6 +393,54 @@ def test_parse_multistatus_response_tolerates_one_bad_date():
     assert good2.properties.modified is not None
 
 
+def test_response_requires_href():
+    """A <d:response> without a <d:href> must be rejected explicitly.
+
+    A bare ``assert`` here would be stripped under ``python -O``, letting
+    a hrefless response through unnoticed instead of raising.
+    """
+    xml = """<d:response xmlns:d="DAV:">
+      <d:propstat>
+        <d:status>HTTP/1.1 200 OK</d:status>
+      </d:propstat>
+    </d:response>"""
+    with pytest.raises(ValueError, match="missing a required"):
+        Response(fromstring(xml))
+
+
+def test_parse_multistatus_response_tolerates_one_missing_href():
+    """A single entry missing its <d:href> must not discard the rest.
+
+    Same reasoning as the malformed-date case, but at the level of the
+    <d:response>-parsing loop itself rather than one property.
+    """
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+    <d:multistatus xmlns:d="DAV:">
+      <d:response>
+        <d:href>/base/good1.txt</d:href>
+        <d:propstat>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+      <d:response>
+        <d:propstat>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+      <d:response>
+        <d:href>/base/good2.txt</d:href>
+        <d:propstat>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+    </d:multistatus>"""
+
+    res = parse_multistatus_response(HTTPResponse(status_code=207, text=xml))
+    assert len(res.responses) == 2
+    assert "/base/good1.txt" in res.responses
+    assert "/base/good2.txt" in res.responses
+
+
 def test_try_parse_multistatus_response_for_not_a_207_response():
     """Test trying to parse with a multistatus response that's not 207."""
     with pytest.raises(ValueError) as exc_info:
