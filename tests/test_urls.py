@@ -75,6 +75,34 @@ def test_path_relative_to(base: str, rel: str, expected: str):
 
 
 @pytest.mark.parametrize(
+    "base, rel",
+    [
+        ("https://example.org/dav", "/dav/../../../etc/cron.d/evil"),
+        ("https://example.org/dav", "/dav/../../etc/passwd"),
+        ("https://example.org/dav", "/davish/other"),
+        ("https://example.org/dav", "/other"),
+        ("https://example.org/dav/sub", "/dav/../evil"),
+        ("https://example.org/dav", "/dav/sub\x00.txt"),
+        ("https://example.org/dav", "/dav/..\\..\\evil"),
+    ],
+)
+def test_path_relative_to_rejects_escaping_href(base: str, rel: str):
+    """A server-supplied href outside of the requested base must be rejected."""
+    with pytest.raises(ValueError):
+        relative_url_to(URL(base), rel)
+
+
+def test_path_relative_to_rejects_percent_encoded_traversal():
+    """A percent-encoded ``..`` in the href, decoded the same way the real
+    call site (``URL(href).path``) does it, must also be rejected.
+    """
+    base = URL("https://example.org/dav")
+    href = URL("https://example.org/dav/%2e%2e/%2e%2e/etc/passwd")
+    with pytest.raises(ValueError):
+        relative_url_to(base, href.path)
+
+
+@pytest.mark.parametrize(
     "base_path, path, expected",
     [
         ("", "", "/"),

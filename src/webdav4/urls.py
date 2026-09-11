@@ -1,5 +1,6 @@
 """URLs parsing logics here."""
 
+from posixpath import normpath
 from re import sub
 
 from httpx import URL
@@ -32,15 +33,29 @@ def join_url_path(hostname: str, path: str) -> str:
 
 
 def relative_url_to(base_url: URL, rel: str) -> str:
-    """Finds relative url to a base url path."""
-    base = base_url.path.strip("/")
-    rel = rel.strip("/")
+    """Finds relative url to a base url path.
+
+    Raises ValueError if ``rel`` does not resolve to a path under
+    ``base_url`` - a server response should never point outside of what
+    was requested. Also rejects embedded NUL bytes and backslashes, which
+    ``posixpath.normpath`` does not treat as separators but which a
+    downstream consumer joining this onto a real filesystem path (e.g. on
+    Windows) might.
+    """
+    if "\x00" in rel or "\\" in rel:
+        raise ValueError(f"{rel!r} contains an unexpected NUL byte or backslash")
+
+    base = normpath(f"/{base_url.path.strip('/')}").strip("/")
+    rel = normpath(f"/{rel.strip('/')}").strip("/")
 
     if base == rel or not rel:
         return "/"
 
     if not base and rel:
         return rel
+
+    if not rel.startswith(f"{base}/"):
+        raise ValueError(f"{rel!r} is not a subpath of {base!r}")
 
     index = len(base) + 1
     return rel[index:]
