@@ -1,6 +1,7 @@
 """Client for the webdav."""
 
 import locale
+import os
 import threading
 from contextlib import contextmanager, suppress
 from functools import partial
@@ -644,8 +645,18 @@ class Client:
         chunk_size: Optional[int] = None,
         callback: Optional[Callable[[int], Any]] = None,
     ) -> None:
-        """Download file from remote path to local path."""
-        with open(to_path, mode="wb") as fobj:
+        """Download file from remote path to local path.
+
+        Refuses to follow a symlink at ``to_path``, so a pre-planted
+        symlink can't redirect the write to an unintended local file
+        (the same class of attack OpenSSH's ``sftp`` client hardened
+        against for downloads).
+        """
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(to_path, flags, 0o666)
+        with os.fdopen(fd, mode="wb") as fobj:
             self.download_fileobj(
                 from_path, fobj, callback=callback, chunk_size=chunk_size
             )

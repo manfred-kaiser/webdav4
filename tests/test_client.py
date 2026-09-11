@@ -592,6 +592,27 @@ def test_download_file(tmp_path: Path, storage_dir: TmpDir, client: Client):
     assert file_path.read_text()
 
 
+def test_download_file_refuses_to_follow_local_symlink(
+    tmp_path: Path, storage_dir: TmpDir, client: Client
+):
+    """A pre-planted symlink at the destination must not be followed.
+
+    Otherwise a download could be redirected to overwrite an unrelated
+    local file the caller never intended to touch.
+    """
+    storage_dir.gen({"data": {"foo": "foo"}})
+    outside_target = tmp_path / "outside.txt"
+    outside_target.write_text("do not touch me")
+
+    symlinked_dest = tmp_path / "dest.txt"
+    symlinked_dest.symlink_to(outside_target)
+
+    with pytest.raises(OSError):
+        client.download_file("/data/foo", symlinked_dest)
+
+    assert outside_target.read_text() == "do not touch me"
+
+
 def test_try_download_directory(tmp_path: Path, storage_dir: TmpDir, client: Client):
     """Test downloading a remote resource to a local file."""
     storage_dir.gen({"data": {"foo": "foo"}})
