@@ -9,10 +9,7 @@ readme = "README.md"
 keywords = [ "fsspec", "webdav", "webdav-cli", "webdav-client" ]
 license = "MIT"
 license-files = [ "LICENSE" ]
-authors = [
-  { name = "Saugat Pachhai", email = "suagatchhetri@outlook.com" },
-  { name = "Manfred Kaiser", email = "manfred.kaiser@ssh-mitm.at" },
-]
+authors = [ { name = "Saugat Pachhai", email = "suagatchhetri@outlook.com" } ]
 maintainers = [ { name = "Manfred Kaiser", email = "manfred.kaiser@ssh-mitm.at" } ]
 requires-python = ">=3.8"
 classifiers = [
