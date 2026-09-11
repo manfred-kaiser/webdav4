@@ -7,7 +7,7 @@ import textwrap
 from argparse import Namespace
 from datetime import datetime, timedelta
 from io import StringIO
-from typing import Any, Dict, List
+from typing import Any
 from unittest import mock
 
 import colorama
@@ -49,8 +49,8 @@ class MemoryFileSystem(_MemoryFS):
     def __init__(self, *args: Any, **storage_options: Any) -> None:
         """Initializing with a custom store for each instance."""
         super().__init__(*args, **storage_options)
-        self.store: Dict[str, Any] = {}
-        self.pseudo_dirs: List[str] = []
+        self.store: dict[str, Any] = {}
+        self.pseudo_dirs: list[str] = []
 
 
 def escape_ansi(line: str) -> str:
@@ -212,10 +212,10 @@ def test_style_size_datetime():
     theme.colored = True
 
     assert theme.style_datetime(format_datetime(dt)) == "\x1b[34m{}\x1b[0m".format(
-        dt.strftime("%b %d %H:%M")
+        dt.strftime("%b %d %H:%M"),
     )
     assert theme.style_size(
-        *human_size(2027)
+        *human_size(2027),
     ) == "\x1b[1m\x1b[32m{}\x1b[0m\x1b[32m{}\x1b[0m".format("2.0", "k")
 
     assert theme.style_size(*human_size(None)) == "\x1b[2m-\x1b[0m"
@@ -438,7 +438,7 @@ def test_ls_cli(capsys: CaptureFixture):
 
     with pytest.raises(FileNotFoundError):
         ns = Namespace(
-            path="not-existing", recursive=False, level=None, full_path=False
+            path="not-existing", recursive=False, level=None, full_path=False,
         )
         assert set(CommandLS(ns, mfs).ls())
 
@@ -474,7 +474,7 @@ def test_ls_cli(capsys: CaptureFixture):
     assert textwrap.dedent(
         """\
         Apr 05 09:40 148.0k README.md
-        Jun 03 03:33   6.2M my-docs.docx"""
+        Jun 03 03:33   6.2M my-docs.docx""",
     ) in escape_ansi(out)
 
     ns = Namespace(path="data/foo", recursive=True, level=None, full_path=False)

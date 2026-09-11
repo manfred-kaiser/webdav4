@@ -1,7 +1,7 @@
 """Parsing propfind response."""
 
 from http.client import responses
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any
 from xml.etree.ElementTree import Element, ElementTree, SubElement
 from xml.etree.ElementTree import fromstring as str2xml
 from xml.etree.ElementTree import tostring as xml2string
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 # Map name used in library with actual prop name
-MAPPING_PROPS: Dict[str, str] = {
+MAPPING_PROPS: dict[str, str] = {
     "content_length": "getcontentlength",
     "etag": "getetag",
     "created": "creationdate",
@@ -26,8 +26,8 @@ MAPPING_PROPS: Dict[str, str] = {
 
 
 def prop(
-    node: Union[Element, ElementTree], name: str, relative: bool = False
-) -> Optional[str]:
+    node: Element | ElementTree, name: str, relative: bool = False,
+) -> str | None:
     """Returns text of the property if it exists under DAV namespace."""
     namespace = "{DAV:}"
     selector = ".//" if relative else ""
@@ -41,16 +41,17 @@ class DAVProperties:
     Only supports a certain set of properties to extract. Others are ignored.
     """
 
-    def __init__(self, response_xml: Optional[Element] = None):
+    def __init__(self, response_xml: Element | None = None):
         """Parses props to certain attributes.
 
         Args:
              response_xml: <d:propstat> element
-        """
-        self.response_xml: Optional[Element] = response_xml
-        self.raw: Dict[str, Any] = {}
 
-        def extract_text(prop_name: str) -> Optional[str]:
+        """
+        self.response_xml: Element | None = response_xml
+        self.raw: dict[str, Any] = {}
+
+        def extract_text(prop_name: str) -> str | None:
             text = (
                 prop(response_xml, MAPPING_PROPS[prop_name], relative=True)
                 if response_xml is not None
@@ -72,9 +73,9 @@ class DAVProperties:
         self.content_length = int(content_length) if content_length else None
         self.content_language = extract_text("content_language")
 
-        collection: Optional[bool] = None
-        resource_type: Optional[str] = None
-        resource_xml: Optional[Element] = None
+        collection: bool | None = None
+        resource_type: str | None = None
+        resource_xml: Element | None = None
 
         if response_xml is not None:
             resource_xml = response_xml.find(".//{DAV:}resourcetype")
@@ -88,11 +89,12 @@ class DAVProperties:
 
         self.display_name = extract_text("display_name")
 
-    def as_dict(self, raw: bool = False) -> Dict[str, Any]:
+    def as_dict(self, raw: bool = False) -> dict[str, Any]:
         """Returns all properties that it supports parsing.
 
         Args:
             raw: Provides raw data instead.
+
         """
         if raw:
             return self.raw
@@ -120,6 +122,7 @@ class Response:
 
         Note: we do parse <d:propstat> to figure out status,
         but we leave <d:prop> to ResourceProps to figure out.
+
         """
         self.response_xml = response_xml
         href = prop(response_xml, "href")
@@ -149,8 +152,8 @@ class Response:
         self.status_code = code
         self.reason_phrase = responses[self.status_code] if self.status_code else None
 
-        self.response_description: Optional[str] = prop(
-            response_xml, "responsedescription"
+        self.response_description: str | None = prop(
+            response_xml, "responsedescription",
         )
         self.error = prop(response_xml, "error")
         self.location = prop(response_xml, "location")
@@ -174,7 +177,7 @@ class Response:
 class MultiStatusResponseError(Exception):
     """Raised when multistatus response has failures in it."""
 
-    def __init__(self, statuses: Dict[str, str]) -> None:
+    def __init__(self, statuses: dict[str, str]) -> None:
         """Pass multiple statuses, which is displayed when error is raised."""
         self.statuses = statuses
 
@@ -205,13 +208,14 @@ class MultiStatusResponse:
 
         Args:
              content: body received from PROPFIND call
+
         """
         self.content = content
         self.tree = tree = str2xml(content)  # noqa: S314
 
-        self.response_description: Optional[str] = prop(tree, "responsedescription")
+        self.response_description: str | None = prop(tree, "responsedescription")
 
-        self.responses: Dict[str, Response] = {}
+        self.responses: dict[str, Response] = {}
         for resp in tree.findall(".//{DAV:}response"):
             r_obj = Response(resp)
             self.responses[r_obj.path_norm] = r_obj
@@ -225,6 +229,7 @@ class MultiStatusResponse:
                 for multiple resources (could be recursive based on the `Depth`
                 as well). We use `href` to match the proper response for that
                 resource.
+
         """
         return self.responses[join_url_path(hostname, path)]
 
@@ -244,8 +249,8 @@ class MultiStatusResponse:
 
 # TODO: support `allprop`?
 def prepare_propfind_request_data(
-    name: Optional[str] = None, namespace: Optional[str] = None
-) -> Optional[str]:
+    name: str | None = None, namespace: str | None = None,
+) -> str | None:
     """Prepares propfind request data from specified name.
 
     In this case, when sent to the server, the `<prop> will only contain the

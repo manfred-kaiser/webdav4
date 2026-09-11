@@ -1,23 +1,22 @@
 """Handle streaming response for file."""
 
 import time
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from functools import partial
 from http import HTTPStatus
 from io import RawIOBase
 from typing import (
     TYPE_CHECKING,
-    Generator,
-    Iterator,
-    Optional,
-    Tuple,
 )
 
 from .http import HTTPNetworkError, HTTPTimeoutException
 from .http import Method as HTTPMethod
 
 if TYPE_CHECKING:
-    from typing_extensions import Buffer, Self
+    from typing import Self
+
+    from typing_extensions import Buffer
 
     from .client import Client
     from .http import Client as HTTPClient
@@ -30,8 +29,8 @@ RESUME_BACKOFF_SECONDS = 1.0
 def _validate_resumed_response(
     response: "HTTPResponse",
     pos: int,
-    etag: Optional[str],
-    last_modified: Optional[str],
+    etag: str | None,
+    last_modified: str | None,
 ) -> None:
     """Ensures a ranged response actually continues from ``pos``.
 
@@ -44,14 +43,14 @@ def _validate_resumed_response(
     if response.status_code != HTTPStatus.PARTIAL_CONTENT:
         raise HTTPNetworkError(
             f"expected a 206 Partial Content response resuming at byte "
-            f"{pos}, got {response.status_code}"
+            f"{pos}, got {response.status_code}",
         )
 
     content_range = response.headers.get("Content-Range", "")
     if not content_range.startswith(f"bytes {pos}-"):
         raise HTTPNetworkError(
             f"expected Content-Range starting at byte {pos}, "
-            f"got {content_range!r}"
+            f"got {content_range!r}",
         )
 
     new_etag = response.headers.get("ETag")
@@ -61,7 +60,7 @@ def _validate_resumed_response(
     new_last_modified = response.headers.get("Last-Modified")
     if last_modified and new_last_modified and new_last_modified != last_modified:
         raise HTTPNetworkError(
-            "resource changed during download (Last-Modified mismatch)"
+            "resource changed during download (Last-Modified mismatch)",
         )
 
 
@@ -79,9 +78,9 @@ def request(client: "HTTPClient", url: "URLTypes", pos: int = 0) -> "HTTPRespons
 def iter_url(
     client: "Client",
     url: "URLTypes",
-    chunk_size: Optional[int] = None,
+    chunk_size: int | None = None,
     pos: int = 0,
-) -> Iterator[Tuple["HTTPResponse", Iterator[bytes]]]:
+) -> Iterator[tuple["HTTPResponse", Iterator[bytes]]]:
     """Iterate over chunks requested from url.
 
     Reopens connection on network failure.
@@ -140,7 +139,7 @@ class IterStream(RawIOBase):
         self,
         client: "Client",
         url: "URLTypes",
-        chunk_size: Optional[int] = None,
+        chunk_size: int | None = None,
     ) -> None:
         """Pass a iterator to stream through."""
         super().__init__()
@@ -153,8 +152,8 @@ class IterStream(RawIOBase):
         self.url = url
         self._loc: int = 0
         self._cm = iter_url(client, self.url, chunk_size=chunk_size)
-        self._iterator: Optional[Iterator[bytes]] = None
-        self._initial_response: Optional[HTTPResponse] = None
+        self._iterator: Iterator[bytes] | None = None
+        self._initial_response: HTTPResponse | None = None
 
     @property
     def supports_ranges(self) -> bool:
@@ -172,7 +171,7 @@ class IterStream(RawIOBase):
         return self.client.detected_features.supports_ranges
 
     @property
-    def size(self) -> Optional[int]:
+    def size(self) -> int | None:
         """Size of the file object."""
         assert self._initial_response
         content_length: str = self._initial_response.headers.get("Content-Length", "")
@@ -198,7 +197,7 @@ class IterStream(RawIOBase):
         self.close()
 
     @property
-    def encoding(self) -> Optional[str]:
+    def encoding(self) -> str | None:
         """Encoding of the response."""
         assert self._initial_response
         return self._initial_response.encoding

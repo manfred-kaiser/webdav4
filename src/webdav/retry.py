@@ -1,8 +1,9 @@
 """Retry mechanism for the webdav Client."""
 
 import time
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Callable, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 from .http import BANDWIDTH_LIMIT_EXCEEDED
 

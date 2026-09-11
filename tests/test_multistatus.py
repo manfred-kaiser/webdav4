@@ -1,7 +1,6 @@
 """Testing multistatus responses."""
 
 from datetime import datetime
-from typing import Optional, Tuple
 from xml.etree.ElementTree import Element, fromstring
 
 import pytest
@@ -45,7 +44,7 @@ def test_prop_relative():
         (),
     ],
 )
-def test_dav_properties_empty(args: Tuple[Element]):
+def test_dav_properties_empty(args: tuple[Element]):
     """Test dav properties when it's empty."""
     props = DAVProperties(*args)
     assert (
@@ -342,7 +341,7 @@ def test_prepare_propfind_data_empty():
     ids=["simple", "namespaced", "unmapped_property"],
 )
 def test_prepare_propfind_data(
-    name: str, namespace: Optional[str], expected_inner_element: str
+    name: str, namespace: str | None, expected_inner_element: str,
 ):
     """Test preparing propfind xml string data."""
     body = prepare_propfind_request_data(name, namespace=namespace)

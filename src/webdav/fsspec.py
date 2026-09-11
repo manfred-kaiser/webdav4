@@ -2,24 +2,19 @@
 
 import errno
 import io
-import os
 import tempfile
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
-    Dict,
-    Iterator,
-    List,
     NamedTuple,
     NoReturn,
     Optional,
     SupportsIndex,
     TextIO,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -40,9 +35,9 @@ from .fs_utils import peek_filelike_length
 if TYPE_CHECKING:
     from datetime import datetime
     from os import PathLike
-    from typing import AnyStr
+    from typing import AnyStr, Self
 
-    from typing_extensions import Buffer, Self
+    from typing_extensions import Buffer
 
     from .types import AuthTypes, URLTypes
 
@@ -50,7 +45,7 @@ if TYPE_CHECKING:
 mapping = {"content_length": "size", "path": "name", "type": "type"}
 
 
-def translate_info(item: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def translate_info(item: str | dict[str, Any]) -> dict[str, Any]:
     """Translate info from the client to as per fsspec requirements."""
     assert not isinstance(item, str)
     return {mapping.get(key, key): value for key, value in item.items()}
@@ -63,7 +58,7 @@ def translate_exceptions() -> Iterator[None]:
         yield
     except ResourceNotFound as exc:
         raise FileNotFoundError(
-            errno.ENOENT, "No such file or directory", exc.path
+            errno.ENOENT, "No such file or directory", exc.path,
         ) from exc
     except IsACollectionError as exc:
         raise IsADirectoryError(errno.EISDIR, "Is a directory", exc.path) from exc
@@ -93,6 +88,7 @@ class WebdavFileSystem(AbstractFileSystem):
                 or extending WebdavFileSystem.
             client_opts: Extra args that are passed to Webdav Client.
                 (refer to it's documenting for more information).
+
         """
         super().__init__()
         client_opts.setdefault("chunk_size", self.blocksize)
@@ -106,8 +102,8 @@ class WebdavFileSystem(AbstractFileSystem):
 
     @translate_exceptions()
     def ls(
-        self, path: str, detail: bool = True, **kwargs: Any
-    ) -> List[Union[str, Dict[str, Any]]]:
+        self, path: str, detail: bool = True, **kwargs: Any,
+    ) -> list[str | dict[str, Any]]:
         """`ls` implementation for fsspec, see fsspec for more information."""
         path = self._strip_protocol(path).strip()
         data = self.client.ls(path, detail=detail, allow_listing_resource=False)
@@ -116,7 +112,7 @@ class WebdavFileSystem(AbstractFileSystem):
         return [translate_info(item) for item in data]
 
     @translate_exceptions()
-    def info(self, path: str, **kwargs: Any) -> Dict[str, Any]:
+    def info(self, path: str, **kwargs: Any) -> dict[str, Any]:
         """Return information about the current path."""
         path = self._strip_protocol(path)
         return translate_info(self.client.info(path))
@@ -149,7 +145,7 @@ class WebdavFileSystem(AbstractFileSystem):
         self,
         path: str,
         recursive: bool = False,
-        maxdepth: Optional[int] = None,
+        maxdepth: int | None = None,
     ) -> None:
         """Delete files and directories."""
         path = self._strip_protocol(path)
@@ -163,8 +159,8 @@ class WebdavFileSystem(AbstractFileSystem):
         path1: str,
         path2: str,
         recursive: bool = False,
-        maxdepth: Optional[int] = None,
-        on_error: Optional[str] = None,
+        maxdepth: int | None = None,
+        on_error: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Copy files and directories."""
@@ -192,7 +188,7 @@ class WebdavFileSystem(AbstractFileSystem):
         path1: str,
         path2: str,
         recursive: bool = False,
-        maxdepth: Optional[bool] = None,
+        maxdepth: bool | None = None,
         **kwargs: Any,
     ) -> None:
         """Move a file/directory from one path to the other."""
@@ -270,9 +266,9 @@ class WebdavFileSystem(AbstractFileSystem):
         self,
         path: str,
         mode: str = "rb",
-        block_size: Optional[int] = None,
+        block_size: int | None = None,
         autocommit: bool = True,
-        cache_options: Optional[Dict[str, str]] = None,
+        cache_options: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> Union["WebdavFile", "UploadFile"]:
         """Return a file-like object from the filesystem."""
@@ -296,13 +292,13 @@ class WebdavFileSystem(AbstractFileSystem):
         )
 
     @translate_exceptions()
-    def checksum(self, path: str) -> Optional[str]:
+    def checksum(self, path: str) -> str | None:
         """Returns checksum/etag of the path."""
         path = self._strip_protocol(path)
         return self.client.etag(path)
 
     @translate_exceptions()
-    def size(self, path: str) -> Optional[int]:
+    def size(self, path: str) -> int | None:
         """Returns size of the path."""
         path = self._strip_protocol(path)
         return self.client.content_length(path)
@@ -323,12 +319,12 @@ class WebdavFileSystem(AbstractFileSystem):
         rpath: str,
         callback: Optional["Callback"] = None,
         overwrite: bool = True,
-        size: Optional[int] = None,
+        size: int | None = None,
         **kwargs: Any,
     ) -> None:
         """Upload contents from the fileobj to the remote path."""
         rpath = self._strip_protocol(rpath)
-        self.mkdirs(os.path.dirname(rpath), exist_ok=True)
+        self.mkdirs(str(PurePosixPath(rpath).parent), exist_ok=True)
 
         if size is None:
             size = peek_filelike_length(fobj)
@@ -356,11 +352,11 @@ class WebdavFileSystem(AbstractFileSystem):
         **kwargs: Any,
     ) -> None:
         """Copy file to remote webdav server."""
-        if os.path.isdir(lpath):
+        if Path(lpath).is_dir():
             rpath = self._strip_protocol(rpath)
             return self.makedirs(rpath, exist_ok=True)
 
-        with open(lpath, mode="rb") as fobj:
+        with Path(lpath).open(mode="rb") as fobj:
             kwargs.setdefault("overwrite", True)
             kwargs.setdefault("size", None)
             return self.upload_fileobj(
@@ -381,10 +377,10 @@ class WebdavFile(AbstractBufferedFile):
         fs: "WebdavFileSystem",
         path: str,
         mode: str = "rb",
-        block_size: Union[int, str, None] = None,
+        block_size: int | str | None = None,
         autocommit: bool = True,
         cache_type: str = "readahead",
-        cache_options: Optional[Dict[str, str]] = None,
+        cache_options: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> None:
         """Instantiate a file-like object with the provided options.
@@ -410,19 +406,19 @@ class WebdavFile(AbstractBufferedFile):
             encoding=encoding,
             chunk_size=self.blocksize,
         )
-        self.reader: Union[TextIO, BinaryIO] = self.fobj.__enter__()
+        self.reader: TextIO | BinaryIO = self.fobj.__enter__()
 
         # only get the file size if GET request didnot send Content-Length
         # or was retrieved before.
         if not self.size:
             if getattr(self.reader, "size", None):
-                self.size = self.reader.size  # type: ignore
+                self.size = self.reader.size  # type: ignore[attr-defined]
             else:
                 self.size = self.fs.size(self.path)
 
         self.closed: bool = False
 
-    def read(self, length: int = -1) -> Union[str, bytes, None]:
+    def read(self, length: int = -1) -> str | bytes | None:
         """Read chunk of bytes."""
         chunk = self.reader.read(length)
         if chunk:
@@ -452,8 +448,8 @@ class WebdavFile(AbstractBufferedFile):
         self.closed = True
 
     def __reduce_ex__(
-        self, protocol: SupportsIndex
-    ) -> Tuple[Callable[["ReopenArgs"], Type["WebdavFile"]], "ReopenArgs"]:
+        self, protocol: SupportsIndex,
+    ) -> tuple[Callable[["ReopenArgs"], type["WebdavFile"]], "ReopenArgs"]:
         """Recreate/reopen file when restored."""
         return reopen, ReopenArgs(  # pragma: no cover
             WebdavFile,
@@ -468,12 +464,12 @@ class WebdavFile(AbstractBufferedFile):
 class ReopenArgs(NamedTuple):
     """Args to reopen the file."""
 
-    file: Type[WebdavFile]
+    file: type[WebdavFile]
     fs: "WebdavFileSystem"
     path: str
-    blocksize: Optional[int]
+    blocksize: int | None
     mode: str
-    size: Optional[int]
+    size: int | None
 
 
 def reopen(args: ReopenArgs) -> WebdavFile:
@@ -513,7 +509,7 @@ class UploadFile(tempfile.SpooledTemporaryFile):
         fs: "WebdavFileSystem",
         path: str,
         mode: str = "wb",
-        block_size: Union[int, str, None] = None,
+        block_size: int | str | None = None,
     ):
         """Extended interface with path and fs."""
         assert fs
@@ -555,7 +551,7 @@ class UploadFile(tempfile.SpooledTemporaryFile):
         self.seek(0)
         fileobj = cast("BinaryIO", self)
         self.fs.client.upload_fileobj(
-            fileobj, self.path, chunk_size=self.blocksize, overwrite=True
+            fileobj, self.path, chunk_size=self.blocksize, overwrite=True,
         )
 
     def close(self) -> None:
@@ -580,7 +576,7 @@ class UploadFile(tempfile.SpooledTemporaryFile):
         out[: len(data)] = data
         return len(data)
 
-    def readuntil(self, char: bytes = b"\n", blocks: Optional[int] = None) -> bytes:
+    def readuntil(self, char: bytes = b"\n", blocks: int | None = None) -> bytes:
         """Read until the given character is found."""
         ret = AbstractBufferedFile.readuntil(self, char=char, blocks=blocks)
         return cast("bytes", ret)

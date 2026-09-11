@@ -2,7 +2,9 @@
 
 import locale
 import os
+import pathlib
 import threading
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from functools import partial
 from http import HTTPStatus
@@ -11,13 +13,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
-    Dict,
-    Iterator,
-    List,
     Literal,
     Optional,
-    Set,
     TextIO,
     Union,
     cast,
@@ -52,8 +49,8 @@ DEFAULT_CHUNK_SIZE = 2**22
 
 
 def _prepare_result_info(
-    response: Response, base_url: URL, detail: bool = True
-) -> Union[str, Dict[str, Any]]:
+    response: Response, base_url: URL, detail: bool = True,
+) -> str | dict[str, Any]:
     """Transform response to a dictionary/str for info/ls."""
     rel = response.path_relative_to(base_url)
     if not detail:
@@ -174,7 +171,7 @@ class FeatureDetection:
     """
 
     supports_ranges: bool
-    dav_compliances: Set[str]
+    dav_compliances: set[str]
 
     def __init__(self, options_response: Optional["HTTPResponse"] = None) -> None:
         """Initialize with the given response."""
@@ -254,12 +251,13 @@ class Client:
                 should be followed
             trust_env: Enables or disables usage of environment variables
                 for configuration
+
         """
         client_opts.update({"base_url": base_url, "auth": auth})
         self.http: HTTPClient = http_client or HTTPClient(**client_opts)
         self.base_url = URL(base_url)
         self.with_retry = retry if callable(retry) else _retry(retry)
-        self._detected_features: Optional[FeatureDetection] = None
+        self._detected_features: FeatureDetection | None = None
         self._detect_feature_lock = threading.RLock()
         self.chunk_size = chunk_size
 
@@ -281,7 +279,7 @@ class Client:
                 self._detected_features = FeatureDetection(resp)
         return self._detected_features
 
-    def options(self, path: str = "") -> Set[str]:
+    def options(self, path: str = "") -> set[str]:
         """Returns features detected in the webdav server."""
         resp = self.http.options(path)
         detected_features = FeatureDetection(resp)
@@ -294,7 +292,7 @@ class Client:
     def propfind(
         self,
         path: str,
-        data: Optional[str] = None,
+        data: str | None = None,
         headers: Optional["HeaderTypes"] = None,
         follow_redirects: bool = False,
     ) -> "MultiStatusResponse":
@@ -313,9 +311,9 @@ class Client:
     def get_props(
         self,
         path: str,
-        name: Optional[str] = None,
-        namespace: Optional[str] = None,
-        data: Optional[str] = None,
+        name: str | None = None,
+        namespace: str | None = None,
+        data: str | None = None,
     ) -> "DAVProperties":
         """Returns properties of a resource by doing a propfind request.
 
@@ -328,7 +326,7 @@ class Client:
         return response.properties
 
     def get_property(
-        self, path: str, name: str, namespace: Optional[str] = None
+        self, path: str, name: str, namespace: str | None = None,
     ) -> Any:
         """Returns appropriate property from the propfind response.
 
@@ -398,7 +396,7 @@ class Client:
         from_path: str,
         to_path: str,
         overwrite: bool,
-        depth: Union[int, str] = "infinity",
+        depth: int | str = "infinity",
     ) -> None:
         """Transfer a resource by copying/moving from a path to the other."""
         assert operation in {HTTPMethod.MOVE, HTTPMethod.COPY}
@@ -435,7 +433,7 @@ class Client:
         self,
         from_path: str,
         to_path: str,
-        depth: Union[int, str] = "infinity",
+        depth: int | str = "infinity",
         overwrite: bool = False,
     ) -> None:
         """Copy resource."""
@@ -484,7 +482,7 @@ class Client:
         path: str,
         detail: bool = True,
         allow_listing_resource: bool = True,
-    ) -> List[Union[str, Dict[str, Any]]]:
+    ) -> list[str | dict[str, Any]]:
         """List items in a resource/collection.
 
         Args:
@@ -494,6 +492,7 @@ class Client:
             allow_listing_resource: If True and path is a resource
                 (non-collection), ls will return the file entry/details.
                 Otherwise, it will raise an error.
+
         """
         result = self.propfind(path, headers={"Depth": "1"}, follow_redirects=True)
         responses = result.responses
@@ -515,7 +514,7 @@ class Client:
             for resp in responses.values()
         ]
 
-    def info(self, path: str) -> Dict[str, Any]:
+    def info(self, path: str) -> dict[str, Any]:
         """Returns information about the path itself."""
         result = self.propfind(path, headers={"Depth": "1"})
         responses = result.responses
@@ -542,7 +541,7 @@ class Client:
         """Checks whether the resource with the given path is a file."""
         return not self.isdir(path)
 
-    def content_length(self, path: str) -> Optional[int]:
+    def content_length(self, path: str) -> int | None:
         """Returns content-length of the resource with the given path."""
         return self.get_props(path, "content_length").content_length
 
@@ -554,15 +553,15 @@ class Client:
         """Returns getlastmodified of the resource with the given path."""
         return self.get_props(path, "modified").modified
 
-    def etag(self, path: str) -> Optional[str]:
+    def etag(self, path: str) -> str | None:
         """Returns etag of the resource with the given path."""
         return self.get_props(path, "etag").etag
 
-    def content_type(self, path: str) -> Optional[str]:
+    def content_type(self, path: str) -> str | None:
         """Returns content type of the resource with the given path."""
         return self.get_props(path, "content_type").content_type
 
-    def content_language(self, path: str) -> Optional[str]:
+    def content_language(self, path: str) -> str | None:
         """Returns content language of the resource with the given path."""
         return self.get_props(path, "content_language").content_language
 
@@ -572,8 +571,8 @@ class Client:
         self,
         path: str,
         mode: Literal["rb"],
-        encoding: Optional[str] = ...,
-        chunk_size: Optional[int] = ...,
+        encoding: str | None = ...,
+        chunk_size: int | None = ...,
     ) -> Iterator[BinaryIO]: ...
 
     @overload
@@ -582,8 +581,8 @@ class Client:
         self,
         path: str,
         mode: Literal["r", "rt"] = ...,
-        encoding: Optional[str] = ...,
-        chunk_size: Optional[int] = ...,
+        encoding: str | None = ...,
+        chunk_size: int | None = ...,
     ) -> Iterator[TextIO]: ...
 
     @overload
@@ -592,18 +591,18 @@ class Client:
         self,
         path: str,
         mode: str,
-        encoding: Optional[str] = ...,
-        chunk_size: Optional[int] = ...,
-    ) -> Iterator[Union[TextIO, BinaryIO]]: ...
+        encoding: str | None = ...,
+        chunk_size: int | None = ...,
+    ) -> Iterator[TextIO | BinaryIO]: ...
 
     @contextmanager
     def open(
         self,
         path: str,
         mode: str = "r",
-        encoding: Optional[str] = None,
-        chunk_size: Optional[int] = None,
-    ) -> Iterator[Union[TextIO, BinaryIO]]:
+        encoding: str | None = None,
+        chunk_size: int | None = None,
+    ) -> Iterator[TextIO | BinaryIO]:
         """Returns file-like object to a resource."""
         if self.isdir(path):
             raise IsACollectionError(path, "Cannot open a collection")
@@ -628,8 +627,8 @@ class Client:
         self,
         from_path: str,
         file_obj: BinaryIO,
-        callback: Optional[Callable[[int], Any]] = None,
-        chunk_size: Optional[int] = None,
+        callback: Callable[[int], Any] | None = None,
+        chunk_size: int | None = None,
     ) -> None:
         """Write stream from path to given file object."""
         with self.open(from_path, mode="rb", chunk_size=chunk_size) as remote_obj:
@@ -642,8 +641,8 @@ class Client:
         self,
         from_path: str,
         to_path: "PathLike[AnyStr]",
-        chunk_size: Optional[int] = None,
-        callback: Optional[Callable[[int], Any]] = None,
+        chunk_size: int | None = None,
+        callback: Callable[[int], Any] | None = None,
     ) -> None:
         """Download file from remote path to local path.
 
@@ -658,7 +657,7 @@ class Client:
         fd = os.open(to_path, flags, 0o666)
         with os.fdopen(fd, mode="wb") as fobj:
             self.download_fileobj(
-                from_path, fobj, callback=callback, chunk_size=chunk_size
+                from_path, fobj, callback=callback, chunk_size=chunk_size,
             )
 
     def upload_file(  # noqa: PLR0913
@@ -666,12 +665,12 @@ class Client:
         from_path: "PathLike[AnyStr]",
         to_path: str,
         overwrite: bool = False,
-        chunk_size: Optional[int] = None,
-        callback: Optional[Callable[[int], Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        chunk_size: int | None = None,
+        callback: Callable[[int], Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """Upload file from local path to a given remote path."""
-        with open(from_path, mode="rb") as fobj:
+        with pathlib.Path(from_path).open(mode="rb") as fobj:
             self.upload_fileobj(
                 fobj,
                 to_path,
@@ -686,10 +685,10 @@ class Client:
         file_obj: BinaryIO,
         to_path: str,
         overwrite: bool = False,
-        callback: Optional[Callable[[int], Any]] = None,
-        chunk_size: Optional[int] = None,
-        size: Optional[int] = None,
-        headers: Optional[Dict[str, str]] = None,
+        callback: Callable[[int], Any] | None = None,
+        chunk_size: int | None = None,
+        size: int | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """Upload file from file object to given path."""
         if headers is None:

@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from _pytest.python_api import ApproxBase
 
@@ -10,20 +10,21 @@ from _pytest.python_api import ApproxBase
 class TmpDir(type(Path())):  # type: ignore
     """Extends Path with `cat` and `gen` methods."""
 
-    def cat(self) -> Union[str, Dict[str, Any]]:
+    def cat(self) -> str | dict[str, Any]:
         """Returns (potentially multiple) paths' contents.
 
         Returns:
             a dict of {path: contents} if the path is a directory,
             otherwise the path contents is returned.
+
         """
         if self.is_dir():
             return {path.name: path.cat() for path in self.iterdir()}
         return self.read_text(encoding="utf8")  # type: ignore[no-any-return]
 
     def gen(
-        self, struct: Union[str, Dict[str, Any]], text: Union[str, bytes] = ""
-    ) -> List[str]:
+        self, struct: str | dict[str, Any], text: str | bytes = "",
+    ) -> list[str]:
         """Creates folder structure locally from the provided structure.
 
         Args:
@@ -32,6 +33,7 @@ class TmpDir(type(Path())):  # type: ignore
                 Dictionary can be nested, which it will create a directory.
                 If it's a string, a file with `text` is created.
             text: optional, only necessary if struct is passed a string.
+
         """
         if not isinstance(struct, dict):
             struct = {struct: text}
@@ -82,5 +84,5 @@ class approx_datetime(ApproxBase):  # noqa: N801, PLW1641
         if isinstance(actual, datetime):
             return abs(self.expected - actual) <= self.abs
         raise AssertionError(  # pragma: no cover
-            "expected type of datetime or timedelta"
+            "expected type of datetime or timedelta",
         )

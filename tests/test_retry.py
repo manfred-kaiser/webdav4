@@ -32,8 +32,8 @@ def test_retry_disabled():
     """Test that retry(False) does not retry."""
     func = mock.MagicMock(
         side_effect=HTTPError(
-            Response(HTTPStatus.SERVICE_UNAVAILABLE.value, request=request)
-        )
+            Response(HTTPStatus.SERVICE_UNAVAILABLE.value, request=request),
+        ),
     )
     with pytest.raises(HTTPError):
         retry(False)(func)
@@ -57,7 +57,7 @@ def test_retry_negative(status_code, retries):
     and reaches maximum retries allowed.
     """
     func = mock.MagicMock(
-        side_effect=HTTPError(Response(status_code.value, request=request))
+        side_effect=HTTPError(Response(status_code.value, request=request)),
     )
     with pytest.raises(HTTPError) as exc_info:
         retry(True)(func)

@@ -1,7 +1,8 @@
 """Testing stream utilities."""
 
+from collections.abc import Iterator
 from io import DEFAULT_BUFFER_SIZE
-from typing import Any, Iterator
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -24,7 +25,7 @@ def test_retry_reconnect_on_failure(
     original_iter_content = HTTPResponse.iter_bytes
 
     def bad_iter_content(
-        response: "HTTPResponse", *args: Any, **kwargs: Any
+        response: "HTTPResponse", *args: Any, **kwargs: Any,
     ) -> Iterator[bytes]:
         """Simulate bad connection."""
         it = original_iter_content(response, *args, **kwargs)
@@ -32,7 +33,7 @@ def test_retry_reconnect_on_failure(
             # Drop connection error on second chunk if there is one
             if i > 0:
                 raise HTTPNetworkError(
-                    "Simulated connection drop", request=response.request
+                    "Simulated connection drop", request=response.request,
                 )
             yield chunk
 
@@ -108,13 +109,13 @@ def test_resume_rejects_response_that_ignores_range(
     original_iter_bytes = HTTPResponse.iter_bytes
 
     def bad_iter_content(
-        response: "HTTPResponse", *args: Any, **kwargs: Any
+        response: "HTTPResponse", *args: Any, **kwargs: Any,
     ) -> Iterator[bytes]:
         it = original_iter_bytes(response, *args, **kwargs)
         for i, chunk in enumerate(it):
             if i > 0:
                 raise HTTPNetworkError(
-                    "Simulated connection drop", request=response.request
+                    "Simulated connection drop", request=response.request,
                 )
             yield chunk
 
@@ -157,7 +158,7 @@ def test_resume_retry_is_bounded(
     from webdav import stream as stream_module
 
     def always_broken_iter_content(
-        *args: Any, **kwargs: Any
+        *args: Any, **kwargs: Any,
     ) -> Iterator[bytes]:
         raise HTTPNetworkError("Simulated connection drop")
         yield  # pragma: no cover
@@ -275,7 +276,7 @@ def test_close_connection_if_nothing_is_read(client: Client):
     response = MagicMock()
 
     with patch.object(client.http, "send", return_value=response), patch.object(
-        client, "isdir", return_value=False
+        client, "isdir", return_value=False,
     ):
         with client.open("sample.txt", mode="rb"):
             response.close.assert_not_called()

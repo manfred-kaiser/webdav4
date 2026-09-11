@@ -1,10 +1,11 @@
 """Tests for webdav client."""
 
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from http import HTTPStatus
 from io import DEFAULT_BUFFER_SIZE, BytesIO
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
@@ -95,7 +96,7 @@ def test_copy_collection(storage_dir: TmpDir, client: Client):
 
 
 def test_try_copy_file_when_destination_already_exists(
-    storage_dir: TmpDir, client: Client
+    storage_dir: TmpDir, client: Client,
 ):
     """Try copying a resource to a destination that's already mapped/exists."""
     storage_dir.gen({"data": {"foo": "foo", "bar": "bar"}})
@@ -118,7 +119,7 @@ def test_try_copy_resource_that_does_not_exist(storage_dir: TmpDir, client: Clie
 
 @pytest.mark.parametrize("from_path", ["data", "data/foo"])
 def test_try_copy_to_destination_parent_does_not_exist(
-    storage_dir: TmpDir, client: Client, from_path: str
+    storage_dir: TmpDir, client: Client, from_path: str,
 ):
     """Try to copy a path to a destination whose parent does not exist yet."""
     storage_dir.gen({"data": {"foo": "foo", "bar": "bar"}})
@@ -211,7 +212,7 @@ def test_move_collection_with_overwrite(storage_dir: TmpDir, client: Client):
 
 @pytest.mark.parametrize("from_path", ["data", "data/foo"])
 def test_move_to_a_dest_whose_parent_does_not_exist(
-    storage_dir: TmpDir, client: Client, from_path: str
+    storage_dir: TmpDir, client: Client, from_path: str,
 ):
     """Test moving a resource to a dest. whose parent don't exists yet."""
     storage_dir.gen({"data": {"foo": "foo", "bar": "bar"}})
@@ -297,7 +298,7 @@ def test_transfer_multistatus_failure(client: Client, method: str):
     )
 
     client.http.request = MagicMock(  # type: ignore[assignment]
-        return_value=response
+        return_value=response,
     )
     func = getattr(client, method)
     with pytest.raises(MultiStatusError) as exc_info:
@@ -308,7 +309,7 @@ def test_transfer_multistatus_failure(client: Client, method: str):
 
 @pytest.mark.parametrize("method", ["copy", "move"])
 def test_transfer_forbidden_operations(
-    client: Client, server_address: URL, method: str
+    client: Client, server_address: URL, method: str,
 ):
     """Test that copy and move handle forbidden operations.
 
@@ -320,7 +321,7 @@ def test_transfer_forbidden_operations(
     response = Response(status_code=403, request=request)
 
     client.http.request = MagicMock(  # type: ignore[assignment]
-        return_value=response
+        return_value=response,
     )
 
     func = getattr(client, method)
@@ -365,13 +366,14 @@ def test_mkdir_forbidden_operations(client: Client, server_address: URL):
             given location in its URL namespace, or
         2) the parent collection of the Request-URI exists but cannot accept
             members
+
     """
     url = server_address.join("container")
     request = Request(HTTPMethod.MKCOL, url)
     response = Response(status_code=403, request=request)
 
     client.http.request = MagicMock(  # type: ignore[assignment]
-        return_value=response
+        return_value=response,
     )
     with pytest.raises(ForbiddenOperation) as exc_info:
         client.mkdir("container")
@@ -382,7 +384,7 @@ def test_mkdir_forbidden_operations(client: Client, server_address: URL):
 
 
 @pytest.mark.parametrize(
-    "path", ["collections", "/collections", "/collections", "/collections/"]
+    "path", ["collections", "/collections", "/collections", "/collections/"],
 )
 def test_mkdir_sends_a_trailing_slash(path: str):
     """Test that mkdir sends a request to the url with a trailing slash.
@@ -391,7 +393,7 @@ def test_mkdir_sends_a_trailing_slash(path: str):
     """
     response = Response(200, request=Request(HTTPMethod.MKCOL, "url"))
     client = Client(
-        "http://example.org", http_client=mock.MagicMock(return_value=response)
+        "http://example.org", http_client=mock.MagicMock(return_value=response),
     )
     with mock.patch.object(client.http, "request", return_value=response) as m:
         client.mkdir(path)
@@ -459,7 +461,7 @@ def test_try_remove_locked_resource_coll(storage_dir: TmpDir, client: Client):
     ],
 )
 def test_client_propfind(
-    structure: Dict[str, Any],
+    structure: dict[str, Any],
     path: str,
     storage_dir: "TmpDir",
     client: Client,
@@ -569,7 +571,7 @@ def test_feature_detection_util():
     assert not fd.dav_compliances
 
     response = Response(
-        HTTPStatus.OK, headers={"DAV": "1,2,3", "Accept-Range": "bytes"}
+        HTTPStatus.OK, headers={"DAV": "1,2,3", "Accept-Range": "bytes"},
     )
     fd = FeatureDetection(response)
     assert fd.supports_ranges is False
@@ -593,7 +595,7 @@ def test_download_file(tmp_path: Path, storage_dir: TmpDir, client: Client):
 
 
 def test_download_file_refuses_to_follow_local_symlink(
-    tmp_path: Path, storage_dir: TmpDir, client: Client
+    tmp_path: Path, storage_dir: TmpDir, client: Client,
 ):
     """A pre-planted symlink at the destination must not be followed.
 
@@ -664,7 +666,7 @@ def test_raising_insufficient_storage():
     resp = Response(status_code=507, request=req)
 
     client.http.request = MagicMock(  # type: ignore[assignment]
-        return_value=resp
+        return_value=resp,
     )
     with pytest.raises(InsufficientStorage) as exc_info:
         client.request("copy", "test")
@@ -737,7 +739,7 @@ def test_upload_file(tmp_path: Path, storage_dir: TmpDir, client: Client):
 
 
 def test_try_upload_file_that_already_exists(
-    tmp_path: Path, storage_dir: TmpDir, client: Client
+    tmp_path: Path, storage_dir: TmpDir, client: Client,
 ):
     """Test uploading a local file to a remote path that is already mapped.."""
     storage_dir.gen({"foo": "foo"})
@@ -752,7 +754,7 @@ def test_try_upload_file_that_already_exists(
 
 
 def test_upload_file_with_overwrite(
-    tmp_path: Path, storage_dir: TmpDir, client: Client
+    tmp_path: Path, storage_dir: TmpDir, client: Client,
 ):
     """Test overwriting an already existing file when uploading."""
     storage_dir.gen({"foo": "foo"})
@@ -811,12 +813,13 @@ def test_attributes(storage_dir: TmpDir, client: Client):
     assert client.content_type("/data/foo") == "application/octet-stream"
     assert client.content_language("/data/foo") == ""
     etag = client.etag("/data/foo")
-    assert etag and isinstance(etag, str)
+    assert etag
+    assert isinstance(etag, str)
     assert client.modified("/data/foo") == approx_datetime(
-        datetime.fromtimestamp(int(stat.st_mtime), tz=timezone.utc)
+        datetime.fromtimestamp(int(stat.st_mtime), tz=UTC),
     )
     assert client.created("/data/foo") == approx_datetime(
-        datetime.fromtimestamp(int(stat.st_ctime), tz=timezone.utc)
+        datetime.fromtimestamp(int(stat.st_ctime), tz=UTC),
     )
 
 
@@ -830,10 +833,10 @@ def test_attributes_dir(storage_dir: TmpDir, client: Client):
     assert client.content_language("/data/") == ""
     assert client.etag("/data/") is None
     assert client.modified("/data/") == approx_datetime(
-        datetime.fromtimestamp(int(stat.st_mtime), tz=timezone.utc)
+        datetime.fromtimestamp(int(stat.st_mtime), tz=UTC),
     )
     assert client.created("/data/") == approx_datetime(
-        datetime.fromtimestamp(int(stat.st_ctime), tz=timezone.utc)
+        datetime.fromtimestamp(int(stat.st_ctime), tz=UTC),
     )
 
 
@@ -865,7 +868,7 @@ def test_client_bad_gateway_error(client: Client, server_address: URL):
     response = Response(status_code=502, request=request)
 
     client.http.request = MagicMock(  # type: ignore[assignment]
-        return_value=response
+        return_value=response,
     )
     with pytest.raises(BadGatewayError) as exc_info:
         client.request(HTTPMethod.PROPFIND, "/container")
@@ -941,7 +944,7 @@ def test_client_retries(client: Client, server_address: URL):
     success_response = Response(status_code=HTTPStatus.OK.value, request=request)
 
     client.http.request = func = MagicMock(  # type: ignore[assignment]
-        side_effect=[failed_response, failed_response, success_response]
+        side_effect=[failed_response, failed_response, success_response],
     )
     client.copy("/container1", "/container2")
     assert func.call_count == 3

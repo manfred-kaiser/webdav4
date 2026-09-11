@@ -1,8 +1,9 @@
 """Server for testing purposes, used on repl and pytest as a fixture."""
 
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager, suppress
-from typing import ContextManager, Iterator, Tuple
+from typing import ContextManager
 
 from cheroot import wsgi
 from httpx import URL
@@ -24,7 +25,7 @@ def get_url_from_addr(host, port) -> URL:
 @contextmanager
 def run_server_on_thread(
     srvr: wsgi.Server,
-) -> Iterator[Tuple[wsgi.Server, threading.Thread]]:
+) -> Iterator[tuple[wsgi.Server, threading.Thread]]:
     """Runs server on a separate thread."""
     srvr.prepare()
     thread = threading.Thread(target=srvr.serve)
@@ -42,8 +43,8 @@ def run_server(
     host: str,
     port: int,
     directory: str,
-    authentication: Tuple[str, str],
-) -> ContextManager[Tuple[wsgi.Server, threading.Thread]]:
+    authentication: tuple[str, str],
+) -> ContextManager[tuple[wsgi.Server, threading.Thread]]:
     """Runs a webdav server."""
     dirmap = {"/": directory}
 

@@ -1,6 +1,6 @@
 """Test fixtures."""
 
-from typing import Iterator, Tuple
+from collections.abc import Iterator
 
 import pytest
 from cheroot import wsgi
@@ -26,7 +26,7 @@ def reduce_backoff_factor():
 
 
 @pytest.fixture
-def auth() -> Tuple[str, str]:
+def auth() -> tuple[str, str]:
     """Auth for the server."""
     return AUTH
 
@@ -41,7 +41,7 @@ def storage_dir(tmp_path_factory) -> TmpDir:
 @pytest.fixture
 def server(
     storage_dir: TmpDir,
-    auth: Tuple[str, str],
+    auth: tuple[str, str],
 ) -> Iterator[wsgi.Server]:
     """Creates a server fixture for testing purpose."""
     with run_server("localhost", 0, str(storage_dir), auth) as (httpd, _):
@@ -55,7 +55,7 @@ def server_address(server: wsgi.Server) -> URL:
 
 
 @pytest.fixture
-def client(auth: Tuple[str, str], server_address: URL) -> Client:
+def client(auth: tuple[str, str], server_address: URL) -> Client:
     """Webdav client to interact with the server."""
     return Client(server_address, auth=auth)
 

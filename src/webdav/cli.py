@@ -598,9 +598,9 @@ class CommandLS(Command):
             # details for it.
             details = {path: self.fs.info(path)}
 
-        for file_path, info in details.items():
+        for raw_path, info in details.items():
             isdir = info.get("type") == "directory"
-            file_path = file_path.strip("/")
+            file_path = raw_path.strip("/")
             within_depth = depth and (
                 0 <= file_path.count(sep) - path_level < depth - 1
             )
@@ -921,7 +921,7 @@ class CommandDiskUsage(Command):
             isdir = False
             details = {path: self.fs.info(path)}
 
-        size = sum(info.get("size", 0) for _, info in details.items())
+        size = sum(info.get("size", 0) for info in details.values())
         sized = Size(*human_size(size))
         size_styled = theme.style_size(sized.nbytes, suff=sized.suff)
         path_styled = theme.style_path(path, isdir=isdir)
