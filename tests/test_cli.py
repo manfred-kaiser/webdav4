@@ -1,5 +1,6 @@
 """Testing dav cli."""
 
+import logging
 import os
 import re
 import sys
@@ -715,12 +716,49 @@ def test_endpoint_url_never_carries_credentials():
     assert str(cmd.endpoint_url) == "http://server.com"
 
 
+def test_run_cli_does_not_log_credentials(
+    monkeypatch: MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """The debug output of the run command never contains the credentials."""
+    memfs = MemoryFileSystem()
+    memfs.mkdir("data")
+    monkeypatch.setattr("sys.stdin", StringIO("ls memory://data" + os.linesep))
+    _, subparsers = get_parser()
+    args = Namespace(
+        path="-",
+        subparsers=subparsers,
+        endpoint_url="http://alice:s3cret@server.com/dav",
+        user="alice",
+        password="s3cret",
+    )
+    with caplog.at_level(logging.DEBUG, logger="webdav4.cli"):
+        CommandRun(args, memfs).run()
+    assert "endpoint_url" in caplog.text
+    assert "s3cret" not in caplog.text
+
+
 def test_redact_sensitive():
     """Known-sensitive keys are replaced before logging, others pass through."""
     values = {"password": "s3cret", "user": "alice", "path": "/foo"}
     redacted = redact_sensitive(values)
     assert redacted == {"password": "***", "user": "alice", "path": "/foo"}
     assert "s3cret" not in str(redacted)
+
+
+@pytest.mark.parametrize(
+    "url, expected",
+    [
+        ("http://alice:s3cret@server.com/dav", "http://***@server.com/dav"),
+        ("alice:s3cret@server.com/dav", "***@server.com/dav"),
+        ("http://alice:pa/ss@server.com", "http://***@server.com"),
+        ("http://server.com/dav?a=b", "http://server.com/dav?a=b"),
+        (None, None),
+    ],
+)
+def test_redact_sensitive_endpoint_url(url, expected):
+    """Credentials embedded in the endpoint url must not reach the log."""
+    redacted = redact_sensitive({"endpoint_url": url, "user": None})
+    assert redacted == {"endpoint_url": expected, "user": None}
 
 
 def test_main():

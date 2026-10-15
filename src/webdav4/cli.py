@@ -483,12 +483,29 @@ def process_url(url: str) -> str:
 
 
 SENSITIVE_ARG_NAMES = {"password"}
+SENSITIVE_URL_ARG_NAMES = {"endpoint_url"}
+
+# Everything up to the last "@" before the query/fragment is userinfo.
+# This errs on the side of redacting too much (e.g. an unescaped "/" in a
+# password), which is what we want for log output.
+_USERINFO_RE = re.compile(r"^((?:[A-Za-z][A-Za-z0-9+.-]*://)?)[^?#]*@")
+
+
+def redact_url_userinfo(value: Any) -> Any:
+    """Masks credentials embedded in a url, leaves other values alone."""
+    if not isinstance(value, str):
+        return value
+    return _USERINFO_RE.sub(r"\1***@", value)
 
 
 def redact_sensitive(values: Dict[str, Any]) -> Dict[str, Any]:
     """Replaces known-sensitive values (e.g. passwords) before logging."""
     return {
-        key: "***" if key in SENSITIVE_ARG_NAMES else value
+        key: "***"
+        if key in SENSITIVE_ARG_NAMES
+        else redact_url_userinfo(value)
+        if key in SENSITIVE_URL_ARG_NAMES
+        else value
         for key, value in values.items()
     }
 
